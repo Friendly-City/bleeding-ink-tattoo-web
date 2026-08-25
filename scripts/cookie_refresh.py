@@ -24,7 +24,7 @@ if SCRAPE_LIB_ALT.exists():
 
 from scrape.providers.cookies import (  # noqa: E402
     load_cookies, summarize, CookieError,
-    cookie_days_remaining, status_label,
+    cookie_days_remaining, auth_cookie_days_remaining, status_label,
 )
 
 
@@ -64,10 +64,11 @@ def main():
               "Drop the exported cookies JSON here and re-run.")
         return 1
 
-    # Validate (raises CookieError if bad)
+    # Validate (raises CookieError if bad). require_sessionid=True so a
+    # cookie file missing the auth cookie is caught here, not at scrape time.
     print(f"source: {src}")
     try:
-        storage = load_cookies(src)
+        storage = load_cookies(src, require_sessionid=True)
     except CookieError as e:
         print(f"!! invalid cookie file: {e}")
         return 1
@@ -75,10 +76,14 @@ def main():
     cookies = storage["cookies"]
     days = cookie_days_remaining(cookies)
     status, emoji = status_label(days)
+    auth_days = auth_cookie_days_remaining(cookies)
+    auth_status, auth_emoji = status_label(auth_days)
     print(f"validation: {emoji} {len(cookies)} cookies parsed OK")
-    print(f"days remaining: {days} ({emoji} {status})")
-    if days is not None and days <= 0:
-        print(f"!! cookies are EXPIRED. Don't bother activating; re-export.")
+    print(f"all-cookie min: {days} days ({emoji} {status})")
+    print(f"auth cookies (sessionid/csrftoken/ds_user_id): {auth_days} days "
+          f"({auth_emoji} {auth_status})  <- this is the number that matters")
+    if auth_days is not None and auth_days <= 0:
+        print(f"!! auth cookies are EXPIRED. Don't bother activating; re-export.")
 
     # Show what would happen
     if ACTIVE.exists():
@@ -113,9 +118,9 @@ def main():
     # Summary
     print(f"\n=== SUMMARY ===")
     print(f"new cookies: {src.name}")
-    print(f"days remaining: {days} ({emoji} {status})")
-    if days is not None and days <= 7:
-        print(f"alert: refresh in {int(days)} days (or sooner)")
+    print(f"auth cookies: {auth_days} days remaining ({auth_emoji} {auth_status})")
+    if auth_days is not None and auth_days <= 7:
+        print(f"alert: refresh in {int(auth_days)} days (or sooner)")
     print(f"\nNext step: python scripts/update_portfolio.py --artist isiah-jackson")
     return 0
 

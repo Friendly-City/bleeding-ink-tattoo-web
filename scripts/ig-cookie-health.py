@@ -5,7 +5,17 @@ Daily IG cookie health check for bleeding-ink-tattoo-web.
 Thin wrapper around the project-agnostic scrape library. Reads
 scripts/cookies/active.json, reports cookie age + last-scrape freshness.
 
-Exits non-zero if cookies are EXPIRED or if no active cookies are present.
+The exit code reflects AUTH-cookie health only (sessionid/csrftoken/
+ds_user_id) -- a full Cookie-Editor export routinely includes short-lived
+telemetry cookies (e.g. Instagram's `wd`, a fixed ~7-day TTL) that have no
+bearing on whether the login session itself still works. The all-cookie
+minimum is still printed for context.
+
+Exit codes:
+    0 - healthy, or advisory (auth cookies still valid, even if inside the
+        REFRESH_THIS_WEEK/WATCH window)
+    2 - unusable: auth cookies expired, no active cookies file, cookie file
+        corrupt, or no auth cookie found in the jar at all
 """
 
 from __future__ import annotations
@@ -18,7 +28,7 @@ sys.path.insert(0, "C:/Users/bbask/Hermes-Workspace/scripts")
 
 from scrape.providers.cookies import (  # noqa: E402
     load_cookies, CookieError,
-    cookie_days_remaining, status_label,
+    cookie_days_remaining, auth_cookie_days_remaining, status_label,
 )
 
 
@@ -42,9 +52,13 @@ def main():
         return 2
 
     cookies = storage["cookies"]
-    days = cookie_days_remaining(cookies)
-    status, emoji = status_label(days)
-    print(f"cookies: {len(cookies)} loaded, days remaining: {days} ({emoji} {status})")
+    all_days = cookie_days_remaining(cookies)
+    all_status, all_emoji = status_label(all_days)
+    auth_days = auth_cookie_days_remaining(cookies)
+    auth_status, auth_emoji = status_label(auth_days)
+    print(f"cookies: {len(cookies)} loaded, all-cookie min: {all_days} ({all_emoji} {all_status})")
+    print(f"auth cookies (sessionid/csrftoken/ds_user_id): {auth_days} days remaining "
+          f"({auth_emoji} {auth_status})")
 
     if LAST_SCRAPE_LOG.exists():
         try:
@@ -58,14 +72,19 @@ def main():
     else:
         print("last scrape: never (no .last_scrape file)")
 
-    # Decide exit code
-    if days is not None and days <= 0:
-        print("\n!! cookies are EXPIRED. Refresh from Chrome.")
+    # Decide exit code from AUTH cookies only -- see module docstring. A
+    # short-lived non-auth cookie decaying must never fail this check.
+    if auth_days is None:
+        print("\n!! no sessionid/csrftoken/ds_user_id cookie found - auth "
+              "status is UNKNOWN. Treating the jar as unusable.")
         return 2
-    if status in ("REFRESH_THIS_WEEK", "WATCH"):
-        print(f"\n!! {status} - cookies expire soon. Plan a refresh.")
-        return 1
-    print("\nOK: all systems normal")
+    if auth_days <= 0:
+        print("\n!! auth cookies are EXPIRED. Refresh from Chrome.")
+        return 2
+    if auth_status in ("REFRESH_THIS_WEEK", "WATCH"):
+        print(f"\n{auth_status}: auth cookies expire in {auth_days} days. "
+              f"Plan a refresh soon (advisory only, not a failure).")
+    print("\nOK: auth cookies are valid")
     return 0
 
 
