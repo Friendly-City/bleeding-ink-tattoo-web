@@ -306,6 +306,12 @@ def main():
         print("\nNext: review changes + commit when ready:")
         print(f"  cd {PROJECT}")
         print(f"  git add . && git commit -m 'feat(portfolio): add {len(new_entries)} IG photos'")
+
+    # Mark a successful scrape so ig-cookie-health.py's staleness check (dead
+    # until this ran once) has something to read.
+    last_scrape_log = Path(__file__).resolve().parent / "cookies" / ".last_scrape"
+    last_scrape_log.parent.mkdir(parents=True, exist_ok=True)
+    last_scrape_log.touch()
     return 0
 
 

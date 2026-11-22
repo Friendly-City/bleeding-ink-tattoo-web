@@ -27,8 +27,10 @@ python scripts/cookie_refresh.py --path scripts/cookies/new_cookies.json
 ```
 
 What it does:
-- Validates the new cookie JSON (right keys, has sessionid/csrftoken)
-- Computes cookie age from the latest expirationDate
+- Validates the new cookie JSON (right keys, requires a `sessionid` cookie to be present)
+- Computes days remaining for `sessionid`/`csrftoken`/`ds_user_id` specifically — not the
+  soonest-expiring cookie in the file, which is usually a short-lived non-auth one (e.g.
+  Instagram's `wd`, a fixed ~7-day cookie) and would otherwise dominate the reported number
 - **Archives the old** `active.json` to `archive/<timestamp>.json` (so you have a rollback if needed)
 - **Replaces** `active.json` with the new set
 - Prints a one-line status (🟢 / 🟡 / 🔴 + days remaining)
@@ -38,18 +40,33 @@ After refresh, your next scrape (manual or cron) uses the new cookies.
 ## Auto-validation
 
 The script checks for:
-- ✅ Required cookies: `sessionid`, `csrftoken`, `ds_user_id`
+- ✅ `sessionid` cookie is present (rejects the file otherwise)
 - ✅ Cookie file is valid JSON
-- ✅ Reasonable age (>0 days, <90 days)
+- ✅ Reports days remaining for the auth cookies specifically (`sessionid`/`csrftoken`/`ds_user_id`)
 
 If validation fails, the script prints what went wrong and exits with a non-zero code. **The old `active.json` is preserved** so you can debug.
 
 ## Cookie lifespan (what to expect)
 
-IG cookies typically last **~30 days** before the `sessionid` expires. The system will alert you when cookies are 21 days old (🟡) and when they're 30+ days old (🔴).
+The `sessionid` cookie typically lasts **~30 days**. Status is based on days
+*remaining* for the auth cookies specifically (`sessionid`/`csrftoken`/
+`ds_user_id`), not the full jar — a full Cookie-Editor export also contains
+short-lived non-auth cookies (e.g. `wd`, a fixed ~7-day cookie) that say
+nothing about whether the session is still valid:
+
+| days remaining | status              |
+|----------------:|--------------------|
+| > 21             | 🟢 HEALTHY          |
+| 8–21             | 🟡 WATCH            |
+| 1–7              | 🟡 REFRESH_THIS_WEEK |
+| ≤ 0              | 🔴 EXPIRED           |
+
+The daily cron check (`ig-cookie-health-daily`) only fails (and pages
+Telegram) on EXPIRED or an unreadable cookie file — WATCH/REFRESH_THIS_WEEK
+print as an advisory, not a failure.
 
 If you notice the scraper failing or no images showing up:
-1. Open the Telegram alerts (already configured via 1mcp cron)
+1. Check the Telegram alert from `ig-cookie-health-daily`
 2. Re-export cookies (steps above)
 3. Re-run the scrape
 
