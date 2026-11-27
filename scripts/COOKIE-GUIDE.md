@@ -31,20 +31,34 @@
 2. Log into the account whose work you want to scrape
 3. Stay logged in for the next steps
 
-## Step 3: Export cookies
+## Step 3: Export cookies (clipboard-only — Cookie-Editor v1.13.0+ has no "Export to file")
+
+Cookie-Editor **only** writes cookies to the **clipboard** — there's no on-screen "Save to file" option. A toast confirms: "Cookies exported to clipboard as JSON".
 
 1. While on instagram.com, click the **Cookie-Editor extension icon** (cookie/jar)
-2. Click the **Export** button
-3. Select **Cookies (JSON)** format (NOT Netscape)
-4. Save the file anywhere convenient (e.g. your Desktop). Chrome will name it something like `cookies.json` or `instagram.com_cookies.json`
+2. Pick the format from the popup: **JSON** (default) — *not* Header String, *not* Netscape
+3. Click the **Export** button (the big one with the down-arrow icon at the bottom-right of the popup)
+4. A toast at the top reads **"Cookies exported to clipboard as JSON"** — confirmed
 
-## Step 4: Drop the file in the right place
+## Step 4: Dump the clipboard to a JSON file (one PowerShell command)
 
-1. Move/save the file to:
-   ```
-   C:/Users/bbask/Coding_Projects/bleeding-ink-tattoo-web/scripts/cookies/
-   ```
-2. Name it whatever you want — e.g. `new_cookies.json`, `2026-09-15_cookies.json`. The `cookie_refresh.py` script will pick the newest file.
+Right after the export (clipboard holds JSON for ~30s before most apps overwrite it), run this in **PowerShell**:
+
+```powershell
+$dst = "C:\Users\bbask\Coding_Projects\bleeding-ink-tattoo-web\scripts\cookies\ig_cookies_$(Get-Date -Format 'yyyy-MM-dd').json"
+[System.IO.File]::WriteAllText($dst, Get-Clipboard, [System.Text.UTF8Encoding]::new($false))
+Get-Content $dst | Select-Object -First 1   # should be "["
+$count = (Get-Content $dst -Raw | ConvertFrom-Json).Count
+"Wrote: $dst with $count cookies"
+```
+
+Expected output (paste the last line tells you the file is good):
+```
+[
+Wrote: C:\Users\...\scripts\cookies\ig_cookies_2026-08-23.json with 11 cookies
+```
+
+If you see `with 0 cookies` — the clipboard was empty or had wrong content; re-run Cookie-Editor's Export and try again **within 30 seconds**.
 
 > **Don't worry about overwriting:** the `cookie_refresh.py` script auto-archives the previous `active.json` to `scripts/cookies/archive/<timestamp>.json` before replacing. You'll have a rollback if the new cookies are broken.
 

@@ -44,6 +44,9 @@ next-env.d.ts
 # Backups
 *.bak
 
+# Private handoff documents stay outside the public repository
+handoffs/
+
 # Wrangler dev artifacts
 .wrangler/
 .open-next/
@@ -52,14 +55,14 @@ scripts/ig_cookies.json
 # IG scrape export output (local-only)
 scripts/.ig_export/
 # IG cookies — local-only (never commit)
-# Ignore ALL .json files in the cookies dir EXCEPT the README and archive (for audit trail)
+# Ignore ALL .json files in the cookies dir. Only the README and archive/.gitkeep are tracked.
+# The archive is NOT an audit trail: a live sessionid was committed there on 2026-08-19.
 scripts/cookies/active.json
 scripts/cookies/.test_fixtures.json
 scripts/cookies/.*.json
 # DO ignore: scripts/cookies/*.json (any cookie export)
 # DO NOT ignore: scripts/cookies/README.md (commit the docs)
 !scripts/cookies/README.md
-!scripts/cookies/archive/
 
 # Python
 __pycache__/
@@ -74,7 +77,7 @@ scripts/cookies/watcher_test_*.json
 
 
 # Catch-all: any .json file dropped into scripts/cookies/ (cookies, exports, fixtures)
-# Only README.md and archive/ contents get committed.
+# Only README.md and archive/.gitkeep get committed — never cookie material.
 scripts/cookies/*.json
+scripts/cookies/archive/*.json
 !scripts/cookies/README.md
-!scripts/cookies/archive/**
